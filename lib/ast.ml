@@ -1,4 +1,4 @@
-type ide = string
+type identifier = string
 
 (* Espressioni *)
 type expr =
@@ -13,13 +13,13 @@ type expr =
   | Not of expr
   | Eq of expr * expr
   | Leq of expr * expr
-  | Var of ide
-  | ArrVar of ide * expr
+  | Var of identifier
+  | ArrVar of identifier * expr
 
 (* Parametri formali *)
 type pf =
-  | Val of ide
-  | Ref of ide
+  | Val of identifier
+  | Ref of identifier
 
 (* Parametri attuali *)
 type pa =
@@ -29,8 +29,8 @@ type pa =
 type dv =
   | NullVar
   | DVSeq of dv * dv
-  | Var of ide
-  | Array of ide * expr
+  | Var of identifier
+  | Array of identifier * expr
 
 (* Comandi *)
 type cmd =
@@ -41,12 +41,12 @@ type cmd =
   | Seq of cmd * cmd
   | Repeat of cmd
   | If of expr * cmd * cmd
-  | DSeq of dv * cmd
+  | Block of dv * cmd
 
 (* Dichiarazioni procedure *)
 type dp =
   | NullProc
   | DPSeq of dp * dp
-  | Proc of ide * pf * cmd
+  | Proc of identifier * pf * cmd
 
 type prog = Prog of dv * dp * cmd

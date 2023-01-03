@@ -1,8 +1,8 @@
 open Ast
 
-type location = int        (* locazione di memoria *)
-type param = pf | pa       (* parametro della procedura *)
-type termination = ok | br (* terminazione dei comandi *)
+type location = int                       (* locazione di memoria *)
+type param = Formal of pf | Current of pa (* parametro della procedura *)
+type termination = OK | BR 	           (* terminazione dei comandi *)
 
 (* Valori dell'ambiente e della memoria *)
 type environment_value = 
