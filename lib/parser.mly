@@ -72,7 +72,13 @@ expr:
   | x = ID { Var(x) }
   | x = ID; LARR; e=expr; RARR { ArrVar(x,e) }
   | LPAREN; e = expr; RPAREN { e }
-;
+
+(* Dichiarazioni variabili e array *)
+dv:
+  | { NullVar }
+  | d0 = dv; SEQ; d1 = dv { DVSeq(d0,d1) }
+  | INT; x = ID { Var(x) }
+  | ARRAY; x = ID; LARR; dim = expr; RARR { Array(x,dim) }
 
 (* Comandi *)
 cmd:
@@ -83,15 +89,8 @@ cmd:
   | c1 = cmd; SEQ; c2 = cmd; { Seq(c1,c2) }
   | REPEAT; c=cmd; FOREVER { Repeat(c) }
   | IF; e0 = expr; THEN; c1 = cmd; ELSE; c2 = cmd; { If(e0,c1,c2) }
-  | d = dv; SEQ; c = cmd { DSeq(d,c) }
+  | d = dv; SEQ; c = cmd { Block(d,c) }
   | LPAREN; c = cmd; RPAREN { c }
-
-(* Dichiarazioni variabili e array *)
-dv:
-  | { NullVar }
-  | d0 = dv; SEQ; d1 = dv { DVSeq(d0,d1) }
-  | INT; x = ID { Var(x) }
-  | ARRAY; x = ID; LARR; dim = expr; RARR { Array(x,dim) }
 
 (* Dichiarazioni procedure *)
 dp:
