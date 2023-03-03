@@ -1,5 +1,11 @@
 open Ast
 open Types
+open Prettyprint
+
+let parse (s : string) : prog =
+  let lexbuf = Lexing.from_string s in
+  let ast = Parser.prog Lexer.read lexbuf in
+  ast
 
 exception TypeError of string
 exception UnboundVar of string
@@ -24,7 +30,7 @@ let rec trace_int expr = match expr with
   | Add(Const(n1),Const(n2)) -> trace_int (Const(n1+n2))
   | Sub(Const(n1),Const(n2)) -> trace_int (Const(n1-n2))
   | Mul(Const(n1),Const(n2)) -> trace_int (Const(n1*n2))
-  | _ -> failwith "expression is not a number."
+  | _ -> failwith ((string_of_expr expr) ^ " is not a number.")
 
 let is_val = function
     True -> true
@@ -32,30 +38,80 @@ let is_val = function
   | Const _ -> true
   | _ -> false
 
-let apply state variable = fun index -> match topenv state variable with
+let apply state variable = match topenv state variable with
     IVar location -> getmem state location
-  | IArr(location,expr) when index < (trace_int expr) -> getmem state (location + index)
   | _ -> failwith "apply error"
 
-let parse (s : string) : prog =
-  let lexbuf = Lexing.from_string s in
-  let ast = Parser.prog Lexer.read lexbuf in
-  ast
+let arr_apply state variable index = match topenv state variable with
+    IArr(location,expr) when index < (trace_int expr) -> getmem state (location + index)
+  | _ -> failwith "apply error"
 
 (******************************************************************************)
 (*                      Small-step semantics of expressions                   *)
 (******************************************************************************)
 
-(* TODO: Espressioni *)
+(* Espressioni *)
 let rec trace1_expr state = function
-  | _ -> failwith "do something with " ^ state
+  | Add(Const(n1),Const(n2)) -> (Const(n1+n2),state)
+  | Add(Const(n1),e2) -> let (e2',state') = trace1_expr state e2 in (Add(Const(n1),e2'),state')
+  | Add(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Add(e1',e2),state')
+  | Sub(Const(n1),Const(n2)) -> (Const(n1-n2),state)
+  | Sub(Const(n1),e2) -> let (e2',state') = trace1_expr state e2 in (Sub(Const(n1),e2'),state')
+  | Sub(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Sub(e1',e2),state')
+  | Mul(Const(n1),Const(n2)) -> (Const(n1*n2),state)
+  | Mul(Const(n1),e2) -> let (e2',state') = trace1_expr state e2 in (Mul(Const(n1),e2'),state')
+  | Mul(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Mul(e1',e2),state')
+  | And(True,e) -> (e,state)
+  | And(False,_) -> (False,state)
+  | And(e1,e2) -> let (e1',state') = trace1_expr state e1 in (And(e1',e2),state')
+  | Or(True,_) -> (True,state)
+  | Or(False,e) -> (e,state)
+  | Or(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Or(e1',e2),state')
+  | Not(True) -> (False,state)
+  | Not(False) -> (True,state)
+  | Not(e) -> let (e',state') = trace1_expr state e in (Not(e'),state')
+  | Eq(Const(n1),Const(n2)) -> if n1=n2 then (True,state) else (False,state)
+  | Eq(Const(n1),e2) -> let (e2',state') = trace1_expr state e2 in (Eq(Const(n1),e2'),state')
+  | Eq(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Eq(e1',e2),state')
+  | Leq(Const(n1),Const(n2)) -> if n1<=n2 then (True,state) else (False,state)
+  | Leq(Const(n1),e2) -> let (e2',state') = trace1_expr state e2 in (Leq(Const(n1),e2'),state')
+  | Leq(e1,e2) -> let (e1',state') = trace1_expr state e1 in (Leq(e1',e2),state')
+  | Var identifier -> (Const(apply state identifier), state)
+  | ArrVar(identifier,e) -> (Const(arr_apply state identifier (trace_int e)), state)
+  | _ -> raise NoRuleApplies
 
-(* TODO: Comandi *)
+(* Comandi *)
 and trace1_cmd = function
-  | _ -> failwith "do something"
+    St _ -> raise NoRuleApplies
+  | Cmd(command,state) -> match command with
+      Skip -> St state
+    | Break -> St state
+    | Assign(identifier,Const(n)) -> (match topenv state identifier with
+        IVar location -> St (getenv state, bind (getmem state) location n, getloc state)
+      | _ -> raise (UnboundVar("Variable " ^ identifier ^ " not defined.")))
+    | Assign(identifier,expression) -> let (expression',state') = trace1_expr state expression in Cmd(Assign(identifier,expression'),state') 
+    | ArrayAssign(identifier,expr_index,Const(n)) -> 
+      (match topenv state identifier with (* Ottiene il valore nell'ambiente *)
+        IArr(first_location,length) -> let index = (trace_int expr_index)              (* Calcola l'indice dell'array *)
+          in if index < (trace_int length) && index >= 0                                     (* Controlla che l'indice sia valido *)
+          then St (getenv state, bind (getmem state) (first_location+index) n, getloc state) (* Restituisce lo stato con il nuovo valore assunto dall'array in data posizione *)
+          else failwith "Index out of bounds."
+        | _ -> raise (UnboundVar("Array " ^ identifier ^ " not defined.")))
+    | ArrayAssign(identifier,expr_index,expression) -> let (expression',state') = trace1_expr state expression 
+      in Cmd(ArrayAssign(identifier,expr_index,expression'),state')
+    | Seq(Break,Repeat(_)) -> St state (* Interrompe il repeat restituendo lo stato *)
+    | Seq(command1,command2) -> (match trace1_cmd (Cmd(command1,state)) with
+          St state1 -> Cmd(command2,state1)
+        | Cmd(command1',state1) -> Cmd(Seq(command1',command2),state1))
+    | Repeat(command') -> Cmd(Seq(command',Repeat(command')),state)
+    | If(True,command1,_) -> Cmd(command1,state)
+    | If(False,_,command2) -> Cmd(command2,state)
+    | If(expression,command1,command2) -> let (expression',state') = trace1_expr state expression in Cmd(If(expression',command1,command2),state')
+    | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value(dv))
+      in Cmd(command', ([environment],getmem state,location)) (* DEBUG *)
 
-let rec sem_decl (environment,location) = function
-  | Value dv -> ( match dv with
+and sem_decl (environment,location) = function
+    Value dv -> ( match dv with
     | NullVar -> (environment,location)
     | DVSeq(dv,dv') -> let (environment',location') = sem_decl (environment,location) (Value dv) in sem_decl (environment',location') (Value dv')
     | Var identifier -> let environment' = bind environment identifier (IVar location) in (environment',location+1)

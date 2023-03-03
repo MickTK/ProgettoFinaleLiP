@@ -2,7 +2,7 @@ open Ast
 
 type location = int                       (* locazione di memoria *)
 type param = Formal of pf | Current of pa (* parametro della procedura *)
-type termination = OK | BR                (* terminazione dei comandi *)
+type termination = Ok | Br                (* terminazione dei comandi *)
 type declaration = Value of dv | Procedure of dp
 
 (* Valori dell'ambiente e della memoria *)
@@ -32,7 +32,8 @@ let getenv (environment_list,_,_) = environment_list
 let getmem (_,memory,_) = memory
 let getloc (_,_,location) = location
 
-type configuration = State of state | Cmd of cmd * state
+
+type configuration = St of state | Cmd of cmd * state
 
 exception TypeError of string
 exception UnboundVar of identifier
