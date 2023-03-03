@@ -21,9 +21,8 @@ type pf =
   | Val of identifier
   | Ref of identifier
 
-(* Parametri attuali *)
-type pa =
-  | CurrentP of expr
+(* Parametro attuale (solo come alias) *)
+type pa = expr
 
 (* Dichiarazioni variabili e array *)
 type dv =
@@ -42,6 +41,7 @@ type cmd =
   | Repeat of cmd
   | If of expr * cmd * cmd
   | Block of dv * cmd
+  | Call of identifier * pa
 
 (* Dichiarazioni procedure *)
 type dp =

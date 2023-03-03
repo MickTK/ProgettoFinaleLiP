@@ -75,10 +75,10 @@ expr:
 
 (* Dichiarazioni variabili e array *)
 dv:
-  | { NullVar }
   | d0 = dv; SEQ; d1 = dv { DVSeq(d0,d1) }
   | INT; x = ID { Var(x) }
   | ARRAY; x = ID; LARR; dim = expr; RARR { Array(x,dim) }
+  | { NullVar }
 
 (* Comandi *)
 cmd:
@@ -89,20 +89,21 @@ cmd:
   | c1 = cmd; SEQ; c2 = cmd; { Seq(c1,c2) }
   | REPEAT; c=cmd; FOREVER { Repeat(c) }
   | IF; e0 = expr; THEN; c1 = cmd; ELSE; c2 = cmd; { If(e0,c1,c2) }
-  | d = dv; SEQ; c = cmd { Block(d,c) }
+  | LBRACE; d = dv; SEQ; c = cmd; RBRACE { Block(d,c) }
   | LPAREN; c = cmd; RPAREN { c }
-
-(* Dichiarazioni procedure *)
-dp:
-  | { NullProc }
-  | d0 = dp; SEQ; d1 = dp { DPSeq(d0,d1) }
-  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE { Proc(x,param,c) }
+  | identifier = ID; LPAREN; param = expr; RPAREN {Call(identifier,param)}
 
 (* Parametri formali *)
 pf:
   | VAL; x = ID { Val(x) }
   | REF; x = ID { Ref(x) }
 
-(* Parametri attuali *)
+(* Dichiarazioni procedure *)
+dp:
+  | d0 = dp; SEQ; d1 = dp { DPSeq(d0,d1) }
+  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE { Proc(x,param,c) }
+  | { NullProc }
+
+(* Parametri attuali 
 pa:
-  | e = expr { CurrentP(e) }
+  | e = expr { CurrentP(e) }*)

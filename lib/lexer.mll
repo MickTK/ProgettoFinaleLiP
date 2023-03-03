@@ -8,7 +8,8 @@ let chr = ['a'-'z' 'A'-'Z' '0'-'9']
 let id = letter chr*
 let num = ['0'-'9']|['1'-'9']['0'-'9']*
 
-rule read = parse
+rule read = 
+  parse
   | white { read lexbuf }
   | "(" { LPAREN }
   | ")" { RPAREN }

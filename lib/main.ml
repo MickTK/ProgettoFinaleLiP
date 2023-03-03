@@ -107,9 +107,30 @@ and trace1_cmd = function
     | If(True,command1,_) -> Cmd(command1,state)
     | If(False,_,command2) -> Cmd(command2,state)
     | If(expression,command1,command2) -> let (expression',state') = trace1_expr state expression in Cmd(If(expression',command1,command2),state')
+    
+    (* DA REVISIONARE *)
     | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value(dv))
-      in Cmd(command', ([environment],getmem state,location)) (* DEBUG *)
+      in Cmd(command', (environment::(getenv state),getmem state,location))
+    
+    | Call(identifier,Const(n)) -> (match topenv state identifier with
+        IProc(Val(x),command') -> 
+          let location = getloc state in
+          let environment = bind (topenv state) x (IVar location) in
+          let memory = bind (getmem state) location n in
+          Cmd(command',(environment::(getenv state),memory,location+1))
+      | _ -> failwith(identifier ^ " accepts only referred parameters.")
+    )
+    | Call(identifier,expression) -> (match topenv state identifier with
+        IProc(Val(_),_) -> 
+          let (expression',state') = trace1_expr state expression in 
+          Cmd(Call(identifier,expression'),state')
+      | IProc(Ref(x),command') ->
+          let environment = bind (topenv state) x ((topenv state) identifier) in
+          Cmd(command',(environment::(getenv state),(getmem state),(getloc state)))
+      | _ -> failwith (identifier ^ " is not a procedure.")
+    )
 
+(* Dichiarazione di variabili e procedure *)
 and sem_decl (environment,location) = function
     Value dv -> ( match dv with
     | NullVar -> (environment,location)
@@ -122,7 +143,7 @@ and sem_decl (environment,location) = function
   | Procedure dp -> ( match dp with
     | NullProc -> (environment,location)
     | DPSeq(dp,dp') -> let (environment',location') = sem_decl (environment,location) (Procedure dp) in sem_decl (environment',location') (Procedure dp')
-    | Proc(identifier,param,cmd) -> let environment' = bind environment identifier (IProc(Formal(param),cmd)) in (environment',location)
+    | Proc(identifier,param,cmd) -> let environment' = bind environment identifier (IProc(param,cmd)) in (environment',location)
   )
 
 let rec trace_rec iterations_number state =

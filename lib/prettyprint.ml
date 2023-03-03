@@ -29,7 +29,8 @@ and string_of_cmd = function
   | Seq(c1,c2) -> string_of_cmd c1 ^ "; " ^ string_of_cmd c2
   | Repeat(command) -> "repeat " ^ (string_of_cmd command) ^ " forever"
   | If(e,c1,c2) -> "if " ^ string_of_expr e ^ " then " ^ string_of_cmd c1 ^ " else " ^ string_of_cmd c2
-  | Block(declaration,command) -> string_of_dv declaration ^  string_of_cmd command
+  | Block(declaration,command) -> string_of_dv declaration ^ string_of_cmd command
+  | Call(identifier,parameter) -> identifier ^ "(" ^ string_of_pa parameter ^ ")"
 
 (* Dichiarazioni *)
 and string_of_dv = function
@@ -47,16 +48,13 @@ and string_of_pf = function
     Val identifier -> "val " ^ identifier
   | Ref identifier -> "ref " ^ identifier
 and string_of_pa = function
-    CurrentP expression -> string_of_expr expression
-and string_of_param = function
-    Formal pf -> string_of_pf pf
-  | Current pa -> string_of_pa pa
+    expression -> string_of_expr expression
 
 (* Ambiente *)
 let string_of_env1 state identifier = match topenv state identifier with
   | IVar location -> string_of_int location ^ "/" ^ identifier
   | IArr(location,expression) -> string_of_int location ^ "/" ^ identifier ^ "[" ^ string_of_expr expression ^ "]"
-  | IProc(parameter,command) -> "proc(" ^ string_of_param parameter ^ "){" ^ string_of_cmd command ^ "}/" ^ identifier
+  | IProc(parameter,command) -> "proc(" ^ string_of_pf parameter ^ "){" ^ string_of_cmd command ^ "}/" ^ identifier
 let rec string_of_env state = function
     [] -> ""
   | [identifier] -> (try string_of_env1 state identifier with _ -> "")
@@ -115,6 +113,7 @@ and vars_of_cmd = function
   | Repeat(command) -> vars_of_cmd command
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
   | Block(dv,command) -> union (vars_of_dv dv) (vars_of_cmd command)
+  | Call(identifier,expression) -> union [identifier] (vars_of_expr expression)
 and vars_of_dv = function
     NullVar -> []
   | DVSeq(dv,dv') -> union (vars_of_dv dv) (vars_of_dv dv')
@@ -128,7 +127,7 @@ and vars_of_pf = function
     Val identifier
   | Ref identifier -> [identifier]
 and vars_of_pa = function
-    CurrentP expression -> vars_of_expr expression
+    expression -> vars_of_expr expression
 
 (* Identificatori usati nel programma *)
 let vars_of_prog (Prog(dv,dp,_)) = union (vars_of_dv dv) (vars_of_dp dp)

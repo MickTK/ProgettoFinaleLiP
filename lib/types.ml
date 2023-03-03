@@ -9,7 +9,7 @@ type declaration = Value of dv | Procedure of dp
 type environment_value = 
       IVar of location        (* locazione di memoria della variabile *)
     | IArr of location * expr (* prima locazione di memoria dell'array, dimensione dell'array *)
-    | IProc of param * cmd
+    | IProc of pf * cmd
 type memory_value = int
 
 (* Definizione di ambiente e memoria *)
