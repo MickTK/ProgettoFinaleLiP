@@ -7,10 +7,15 @@ open Lip22Lib.Main
  trace test : (command, n_steps, location, expected value after n_steps)
  **********************************************************************)
 
+let a = [
+    ("int x; int y; int z; proc g(ref y) { y:=y+1 }; x := 10; g(x); x := x+1",20,"x",12);
+    ("int x; int y; proc f(val x) { x:=x+2 } proc g(val y) { f(x) }; x := 10; g(0); x := x+1",20,"x",11);
+]
+
 let test_trace = [
     ("int x; x:=0; x:=x+1",5,"x",1);
     ("int x; int y; int w; proc f(val z) { z:=x; x:=y; y:=z }; x := 10; y := 20; f(0)",20,"x",20);
-    ("int x; int y; proc f(val x) { x:=x+2 }; proc g(val y) { f(x) }; x := 10; g(0); x := x+1",20,"x",11);
+    ("int x; int y; proc f(val x) { x:=x+2 } proc g(val y) { f(x) }; x := 10; g(0); x := x+1",20,"x",11);
     ("int x; proc f(ref y) { y := y+1 } proc g(ref y) { y := y-1 }; x:=51; f(x); g(x)",20,"x",51);
     ("int x; int res; proc f(ref x) { if x=0 then res:=1 else if x=1 then res:=0 else ( x:=x-2; f(x) ) }; x:=8; f(x)",50,"res",1);
     ("int x; int res; proc f(ref x) { if x=0 then res:=1 else if x=1 then res:=0 else ( x:=x-2; f(x) ) }; x:=9; f(x)",50,"res",0);

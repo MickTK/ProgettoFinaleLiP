@@ -109,25 +109,38 @@ and trace1_cmd = function
     | If(expression,command1,command2) -> let (expression',state') = trace1_expr state expression in Cmd(If(expression',command1,command2),state')
     
     (* DA REVISIONARE *)
-    | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value(dv))
-      in Cmd(command', (environment::(getenv state),getmem state,location))
+    | Block(NullVar,command') -> (match trace1_cmd (Cmd(command',state)) with
+        St state' -> St (popenv state', getmem state', getloc state')
+      | Cmd(command0,state') -> Cmd(Block(NullVar,command0),state'))
+    | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value dv) in 
+      Cmd(Block(NullVar,command'),(environment::(getenv state),getmem state,location))
     
-    | Call(identifier,Const(n)) -> (match topenv state identifier with
-        IProc(Val(x),command') -> 
-          let location = getloc state in
-          let environment = bind (topenv state) x (IVar location) in
-          let memory = bind (getmem state) location n in
-          Cmd(command',(environment::(getenv state),memory,location+1))
-      | _ -> failwith(identifier ^ " accepts only referred parameters.")
+    | Call(identifier,Var(x)) -> (match topenv state identifier with        (* Guardiamo a cosa è associato l'identificatore *)
+        IProc(Val(y),command') -> (match ((topenv state) x) with            (* Se è una procedura, controlliamo a cosa è associato il parametro (variabile) in ingresso *)
+            IVar(location) -> let value = (getmem state) location in        (* Recuperiamo dalla memoria il valore della variabile *)
+              Cmd(Block(Var(y),Seq(Assign(y,Const(value)),command')),state) (* Passiamo il comando al blocco che assocerà il parametro attuale a quello formale *)
+          | _ -> failwith (x ^ " is not a variable.")
+        )
+      | IProc(Ref(y),command') -> (match (topenv state) x with                            (* Controlliamo a cosa è associato il parametro (variabile) in ingresso *)
+                IVar(location) -> let (environment,_) =                                   (* Se è associato ad una variabile *)
+                  sem_decl (topenv state,location) (Value (Var(y))) in                    (* Crea il nuovo ambiente della procedura definendo y e associando la locazione di x alla locazione di y *)
+                  let state' = (environment::(getenv state),getmem state,getloc state) in (* Aggiunge l'ambiente della procedura alla lista, preservando la prima locazione libera *)
+                  Cmd(Block(NullVar,command'), state')                                    (* Passa il controllo al blocco, che si occuperà di effettuare i comandi *)
+              | _ -> failwith (x ^ " is not a variable.")
+            )
+      | _ -> (failwith "ops")
     )
+    (* Passiamo una costante intera come parametro della procedura *)
+    | Call(identifier,Const(n)) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
+          IProc(Val(x),command') -> Cmd(Block(Var(x),Seq(Assign(x,Const(n)),command')),state)
+        | _ -> failwith(identifier ^ " accepts only referred parameters.")
+    )
+    (* Valuta l'espressione passata come parametro della procedura *)
     | Call(identifier,expression) -> (match topenv state identifier with
-        IProc(Val(_),_) -> 
-          let (expression',state') = trace1_expr state expression in 
-          Cmd(Call(identifier,expression'),state')
-      | IProc(Ref(x),command') ->
-          let environment = bind (topenv state) x ((topenv state) identifier) in
-          Cmd(command',(environment::(getenv state),(getmem state),(getloc state)))
-      | _ -> failwith (identifier ^ " is not a procedure.")
+          IProc(Val(_),_) -> (match trace1_expr state expression with
+              (expression',state') -> Cmd(Call(identifier,expression'),state')
+          )
+        | _ -> failwith(identifier ^ " accepts only referred parameters.") (* Solo le procedure che prendono un parametro per valore possono prendere un'espressione in input. Le procedure che prendono invece un parametro per riferimento possono prendere in input solo il nome di una variabile (alla quale si farà riferimento) *)
     )
 
 (* Dichiarazione di variabili e procedure *)
