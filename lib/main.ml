@@ -118,7 +118,12 @@ and trace1_cmd = function
     | Call(identifier,Var(x)) -> (match topenv state identifier with        (* Guardiamo a cosa è associato l'identificatore *)
         IProc(Val(y),command') -> (match ((topenv state) x) with            (* Se è una procedura, controlliamo a cosa è associato il parametro (variabile) in ingresso *)
             IVar(location) -> let value = (getmem state) location in        (* Recuperiamo dalla memoria il valore della variabile *)
-              Cmd(Block(Var(y),Seq(Assign(y,Const(value)),command')),state) (* Passiamo il comando al blocco che assocerà il parametro attuale a quello formale *)
+              let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(y))) in
+              let state0 = (environment::(getenv state),getmem state,location) in
+              (match trace1_cmd (Cmd(Assign(y,Const(value)),state0)) with
+                  St state1 -> Cmd(Block(NullVar,command'),state1)
+                | _ -> failwith ("Non succede mai.")
+              )
           | _ -> failwith (x ^ " is not a variable.")
         )
       | IProc(Ref(y),command') -> (match (topenv state) x with                            (* Controlliamo a cosa è associato il parametro (variabile) in ingresso *)
@@ -130,17 +135,28 @@ and trace1_cmd = function
             )
       | _ -> (failwith "ops")
     )
-    (* Passiamo una costante intera come parametro della procedura *)
-    | Call(identifier,Const(n)) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
-          IProc(Val(x),command') -> Cmd(Block(Var(x),Seq(Assign(x,Const(n)),command')),state)
-        | _ -> failwith(identifier ^ " accepts only referred parameters.")
-    )
-    (* Valuta l'espressione passata come parametro della procedura *)
-    | Call(identifier,expression) -> (match topenv state identifier with
+    (* Viene chiamata una procedura passando un'espressione come parametro *)
+    | Call(identifier,expression) -> (match expression with
+      (* Viene passata una costante intera come parametro della procedura *)
+        Const(n) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
+          IProc(Val(x),command') ->
+            (* Dichiara la variabile nel nuovo ambiente *)
+            let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(x))) in
+            (* Crea il nuovo stato *)
+            let state0 = (environment::(getenv state),getmem state,location) in
+            (* Assegna il valore alla parametro della procedura *)
+            (match trace1_cmd (Cmd(Assign(x,Const(n)),state0)) with
+                St state1 -> Cmd(Block(NullVar,command'),state1)
+              | _ -> failwith ("Non succede mai."))
+        | IProc(Ref(_),_) -> failwith(identifier ^ " accepts only referred parameters.") (* Non si possono passare espressioni per riferimento *)
+        | _ -> failwith(identifier ^ " is not a procedure!")                             (* Non si può chiamare una variabile o un vettore come procedura *)
+        )
+      (* Viene passata un'espressione generica come parametro della procedura *)
+      | _ -> (match topenv state identifier with
           IProc(Val(_),_) -> (match trace1_expr state expression with
               (expression',state') -> Cmd(Call(identifier,expression'),state')
           )
-        | _ -> failwith(identifier ^ " accepts only referred parameters.") (* Solo le procedure che prendono un parametro per valore possono prendere un'espressione in input. Le procedure che prendono invece un parametro per riferimento possono prendere in input solo il nome di una variabile (alla quale si farà riferimento) *)
+        | _ -> failwith(identifier ^ " accepts only referred parameters.")) (* Solo le procedure che prendono un parametro per valore possono prendere un'espressione in input. Le procedure che prendono invece un parametro per riferimento possono prendere in input solo il nome di una variabile (alla quale si farà riferimento) *)
     )
 
 (* Dichiarazione di variabili e procedure *)

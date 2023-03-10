@@ -7,9 +7,8 @@ open Lip22Lib.Main
  trace test : (command, n_steps, location, expected value after n_steps)
  **********************************************************************)
 
-let a = [
-    ("int x; int y; int z; proc g(ref y) { y:=y+1 }; x := 10; g(x); x := x+1",20,"x",12);
-    ("int x; int y; proc f(val x) { x:=x+2 } proc g(val y) { f(x) }; x := 10; g(0); x := x+1",20,"x",11);
+let v = [
+    ("int x; int r; proc f(val n) { if n=0 then r:=1 else ( f(n-1); r:=r*n ) }; x := 5; f(x)",50,"r",120);
 ]
 
 let test_trace = [
