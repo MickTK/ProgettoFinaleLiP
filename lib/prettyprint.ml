@@ -31,6 +31,7 @@ and string_of_cmd = function
   | If(e,c1,c2) -> "if " ^ string_of_expr e ^ " then " ^ string_of_cmd c1 ^ " else " ^ string_of_cmd c2
   | Block(declaration,command) -> string_of_dv declaration ^ string_of_cmd command
   | Call(identifier,parameter) -> identifier ^ "(" ^ string_of_pa parameter ^ ")"
+  | CallExec command -> string_of_cmd command
 
 (* Dichiarazioni *)
 and string_of_dv = function
@@ -114,6 +115,7 @@ and vars_of_cmd = function
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
   | Block(dv,command) -> union (vars_of_dv dv) (vars_of_cmd command)
   | Call(identifier,expression) -> union [identifier] (vars_of_expr expression)
+  | CallExec command -> vars_of_cmd command
 and vars_of_dv = function
     NullVar -> []
   | DVSeq(dv,dv') -> union (vars_of_dv dv) (vars_of_dv dv')

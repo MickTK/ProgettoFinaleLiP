@@ -42,6 +42,7 @@ type cmd =
   | If of expr * cmd * cmd
   | Block of dv * cmd
   | Call of identifier * pa
+  | CallExec of cmd
 
 (* Dichiarazioni procedure *)
 type dp =

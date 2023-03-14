@@ -13,10 +13,10 @@ exception PredOfZero
 exception NoRuleApplies
 
 (* Ambiente *)
-let botenv = fun x -> failwith ("variable " ^ x ^ " unbound")
+let botenv = fun x -> failwith ("Variable " ^ x ^ " unbound")
 
 (* Memoria *)
-let botmem = fun l -> failwith ("location " ^ string_of_int l ^ " undefined")
+let botmem = fun l -> failwith ("Location " ^ string_of_int l ^ " undefined")
 
 (*
   bind environment identifier environment_value -> env{identifier/environment_value}
@@ -91,12 +91,12 @@ and trace1_cmd = function
       | _ -> raise (UnboundVar("Variable " ^ identifier ^ " not defined.")))
     | Assign(identifier,expression) -> let (expression',state') = trace1_expr state expression in Cmd(Assign(identifier,expression'),state') 
     | ArrayAssign(identifier,expr_index,Const(n)) -> 
-      (match topenv state identifier with (* Ottiene il valore nell'ambiente *)
-        IArr(first_location,length) -> let index = (trace_int expr_index)              (* Calcola l'indice dell'array *)
+      (match topenv state identifier with                                                    (* Ottiene il valore nell'ambiente *)
+        IArr(first_location,length) -> let index = (trace_int expr_index)                    (* Calcola l'indice dell'array *)
           in if index < (trace_int length) && index >= 0                                     (* Controlla che l'indice sia valido *)
           then St (getenv state, bind (getmem state) (first_location+index) n, getloc state) (* Restituisce lo stato con il nuovo valore assunto dall'array in data posizione *)
           else failwith "Index out of bounds."
-        | _ -> raise (UnboundVar("Array " ^ identifier ^ " not defined.")))
+        | _ -> raise (UnboundVar("Array " ^ identifier ^ " is not defined.")))
     | ArrayAssign(identifier,expr_index,expression) -> let (expression',state') = trace1_expr state expression 
       in Cmd(ArrayAssign(identifier,expr_index,expression'),state')
     | Seq(Break,Repeat(_)) -> St state (* Interrompe il repeat restituendo lo stato *)
@@ -106,58 +106,47 @@ and trace1_cmd = function
     | Repeat(command') -> Cmd(Seq(command',Repeat(command')),state)
     | If(True,command1,_) -> Cmd(command1,state)
     | If(False,_,command2) -> Cmd(command2,state)
+    | If(Const(n),_,_) -> raise (TypeError (string_of_int n ^ " is not a boolean"))
     | If(expression,command1,command2) -> let (expression',state') = trace1_expr state expression in Cmd(If(expression',command1,command2),state')
-    
-    (* DA REVISIONARE *)
     | Block(NullVar,command') -> (match trace1_cmd (Cmd(command',state)) with
         St state' -> St (popenv state', getmem state', getloc state')
       | Cmd(command0,state') -> Cmd(Block(NullVar,command0),state'))
     | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value dv) in 
       Cmd(Block(NullVar,command'),(environment::(getenv state),getmem state,location))
-    
     | Call(identifier,Var(x)) -> (match topenv state identifier with        (* Guardiamo a cosa è associato l'identificatore *)
         IProc(Val(y),command') -> (match ((topenv state) x) with            (* Se è una procedura, controlliamo a cosa è associato il parametro (variabile) in ingresso *)
             IVar(location) -> let value = (getmem state) location in        (* Recuperiamo dalla memoria il valore della variabile *)
               let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(y))) in
               let state0 = (environment::(getenv state),getmem state,location) in
               (match trace1_cmd (Cmd(Assign(y,Const(value)),state0)) with
-                  St state1 -> Cmd(Block(NullVar,command'),state1)
-                | _ -> failwith ("Non succede mai.")
+                  St state1 -> Cmd(CallExec command',state1)
+                | _ -> failwith ("Non leggerete mai questo messaggio >:) bwahahahaha")
               )
-          | _ -> failwith (x ^ " is not a variable.")
+          | _ -> raise (TypeError (x ^ " is not a variable."))
         )
       | IProc(Ref(y),command') -> (match (topenv state) x with                            (* Controlliamo a cosa è associato il parametro (variabile) in ingresso *)
                 IVar(location) -> let (environment,_) =                                   (* Se è associato ad una variabile *)
                   sem_decl (topenv state,location) (Value (Var(y))) in                    (* Crea il nuovo ambiente della procedura definendo y e associando la locazione di x alla locazione di y *)
                   let state' = (environment::(getenv state),getmem state,getloc state) in (* Aggiunge l'ambiente della procedura alla lista, preservando la prima locazione libera *)
-                  Cmd(Block(NullVar,command'), state')                                    (* Passa il controllo al blocco, che si occuperà di effettuare i comandi *)
+                  Cmd(CallExec command', state')                                          (* Passa il controllo al blocco, che si occuperà di effettuare i comandi *)
               | _ -> failwith (x ^ " is not a variable.")
             )
       | _ -> (failwith "ops")
     )
-    (* Viene chiamata una procedura passando un'espressione come parametro *)
-    | Call(identifier,expression) -> (match expression with
-      (* Viene passata una costante intera come parametro della procedura *)
-        Const(n) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
+    | Call(identifier,Const(n)) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
           IProc(Val(x),command') ->
-            (* Dichiara la variabile nel nuovo ambiente *)
-            let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(x))) in
-            (* Crea il nuovo stato *)
-            let state0 = (environment::(getenv state),getmem state,location) in
-            (* Assegna il valore alla parametro della procedura *)
-            (match trace1_cmd (Cmd(Assign(x,Const(n)),state0)) with
-                St state1 -> Cmd(Block(NullVar,command'),state1)
+            let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(x))) in (* Dichiara la variabile nel nuovo ambiente *)
+            let state0 = (environment::(getenv state),getmem state,location) in                   (* Crea il nuovo stato *)
+            (match trace1_cmd (Cmd(Assign(x,Const(n)),state0)) with                               (* Assegna il valore al parametro della procedura *)
+                St state1 -> Cmd(CallExec command',state1)                                        (* Esegue la procedura *)
               | _ -> failwith ("Non succede mai."))
         | IProc(Ref(_),_) -> failwith(identifier ^ " accepts only referred parameters.") (* Non si possono passare espressioni per riferimento *)
         | _ -> failwith(identifier ^ " is not a procedure!")                             (* Non si può chiamare una variabile o un vettore come procedura *)
-        )
-      (* Viene passata un'espressione generica come parametro della procedura *)
-      | _ -> (match topenv state identifier with
-          IProc(Val(_),_) -> (match trace1_expr state expression with
-              (expression',state') -> Cmd(Call(identifier,expression'),state')
-          )
-        | _ -> failwith(identifier ^ " accepts only referred parameters.")) (* Solo le procedure che prendono un parametro per valore possono prendere un'espressione in input. Le procedure che prendono invece un parametro per riferimento possono prendere in input solo il nome di una variabile (alla quale si farà riferimento) *)
     )
+    | Call(identifier,expression) -> let (expression',_) = trace1_expr state expression in Cmd(Call(identifier,expression'),state)
+    | CallExec command' -> (match trace1_cmd (Cmd(command',state)) with (* Esegue la procedura *)
+        St state' -> St(popenv state', getmem state', getloc state') (* Termina l'esecuzione della procedura *)
+      | Cmd(command0,state') -> Cmd(CallExec(command0),state'))      (* Continua l'esecuzione della procedura *)
 
 (* Dichiarazione di variabili e procedure *)
 and sem_decl (environment,location) = function
