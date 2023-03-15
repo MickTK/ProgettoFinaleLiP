@@ -33,21 +33,25 @@ and string_of_cmd = function
   | Call(identifier,parameter) -> identifier ^ "(" ^ string_of_pa parameter ^ ")"
   | CallExec command -> string_of_cmd command
 
-(* Dichiarazioni *)
+(* Dichiarazioni variabili *)
 and string_of_dv = function
     NullVar -> "null"
   | DVSeq(decl1,decl2) -> string_of_dv decl1 ^ "; " ^ string_of_dv decl2
   | Var identifier -> "int " ^ identifier
   | Array(identifier,length) -> "array " ^ identifier ^ "[" ^ string_of_expr length ^ "]"
+
+(* Dichiarazioni procedure *)
 and string_of_dp = function
     NullProc -> "null"
   | DPSeq(decl1,decl2) -> string_of_dp decl1 ^ "; " ^ string_of_dp decl2
   | Proc(identifier,parameter,command) -> "proc " ^ identifier ^ "(" ^ string_of_pf parameter ^ ") {" ^ string_of_cmd command ^ "}"
 
-(* Parametri delle procedure *)
+(* Parametri formali *)
 and string_of_pf = function
     Val identifier -> "val " ^ identifier
   | Ref identifier -> "ref " ^ identifier
+
+(* Parametri attuali *)
 and string_of_pa = function
     expression -> string_of_expr expression
 
@@ -79,7 +83,7 @@ let rec getlocs environment = function (* Es: [0,1,2,3,10,11,12] *)
   | IProc(_,_) -> [])
   with _ -> getlocs environment dom
 
-(* Rappresenta uno stato sottoforma di stringa, ad esempio: "[IVar(0)/foo], [5/0]" *)
+(* Rappresenta uno stato sottoforma di stringa, ad esempio: "[0/foo], [5/0]" *)
 let string_of_state state domain =
 "[" ^ string_of_env state domain ^ "], " ^
 "[" ^ string_of_mem (getmem state,getloc state) ^ "]" ^ ", " ^
