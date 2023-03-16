@@ -21,6 +21,16 @@ open Ast
 %token THEN
 %token ELSE
 
+%token REPEAT
+%token FOREVER
+%token BREAK
+
+%token INT
+%token PROC
+%token ARRAY
+%token VAL
+%token REF
+
 %token LPAREN
 %token RPAREN
 %token LBRACE
@@ -28,16 +38,6 @@ open Ast
 %token LARR
 %token RARR
 %token EOF
-
-%token PROC
-%token REPEAT
-%token FOREVER
-%token BREAK
-
-%token ARRAY
-%token VAL
-%token REF
-%token INT
 
 %left SEQ
 %nonassoc ELSE
@@ -56,6 +56,20 @@ prog:
   | d0 = dv; d1 = dp; c = cmd; EOF { Prog(d0,d1,c) }
 ;
 
+(* Dichiarazioni variabili e array *)
+dv:
+  | d0 = dv; SEQ; d1 = dv { DVSeq(d0,d1) }
+  | INT; x = ID { Var(x) }
+  | ARRAY; x = ID; LARR; dim = expr; RARR { Array(x,dim) }
+  | { NullVar }
+
+(* Dichiarazioni procedure *)
+dp:
+  | d0 = dp; SEQ; d1 = dp { DPSeq(d0,d1) }
+  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE; d = dp { DPSeq(Proc(x,param,c),d) }
+  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE { Proc(x,param,c) }
+  | { NullProc }
+
 (* Espressioni *)
 expr:
   | n = CONST { Const(int_of_string n) }
@@ -72,13 +86,6 @@ expr:
   | x = ID { Var(x) }
   | x = ID; LARR; e=expr; RARR { ArrVar(x,e) }
   | LPAREN; e = expr; RPAREN { e }
-
-(* Dichiarazioni variabili e array *)
-dv:
-  | d0 = dv; SEQ; d1 = dv { DVSeq(d0,d1) }
-  | INT; x = ID { Var(x) }
-  | ARRAY; x = ID; LARR; dim = expr; RARR { Array(x,dim) }
-  | { NullVar }
 
 (* Comandi *)
 cmd:
@@ -97,13 +104,6 @@ cmd:
 pf:
   | VAL; x = ID { Val(x) }
   | REF; x = ID { Ref(x) }
-
-(* Dichiarazioni procedure *)
-dp:
-  | d0 = dp; SEQ; d1 = dp { DPSeq(d0,d1) }
-  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE; d = dp { DPSeq(Proc(x,param,c),d) }
-  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE { Proc(x,param,c) }
-  | { NullProc }
 
 (* Parametri attuali 
 pa:

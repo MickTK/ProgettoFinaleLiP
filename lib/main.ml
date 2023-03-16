@@ -2,11 +2,6 @@ open Ast
 open Types
 open Prettyprint
 
-exception TypeError of string
-exception UnboundVar of string
-exception PredOfZero
-exception NoRuleApplies
-
 let parse (s : string) : prog =
   let lexbuf = Lexing.from_string s in
   let ast = Parser.prog Lexer.read lexbuf in
@@ -86,7 +81,7 @@ and trace1_cmd = function
     St _ -> raise NoRuleApplies
   | Cmd(command,state) -> match command with
       Skip -> St state
-    | Break -> St state
+    | Break -> failwith ("There is no repeat loop to break!")
     | Assign(identifier,Const(n)) -> (match topenv state identifier with
         IVar location -> St (getenv state, bind (getmem state) location n, getloc state)
       | _ -> raise (UnboundVar("Variable " ^ identifier ^ " not defined.")))
@@ -100,8 +95,7 @@ and trace1_cmd = function
         | _ -> raise (UnboundVar("Array " ^ identifier ^ " is not defined.")))
     | ArrayAssign(identifier,expr_index,expression) -> let (expression',state') = trace1_expr state expression 
       in Cmd(ArrayAssign(identifier,expr_index,expression'),state')
-    | Seq(Break,Repeat(_)) -> St state (* Interrompe il repeat restituendo lo stato *)
-    | Seq(Break,Seq(_,c2)) -> Cmd(Seq(Break,c2),state)
+    | Seq(Break,Repeat(_)) -> St state
     | Seq(Break,_) -> Cmd(Break,state)
     | Seq(command1,command2) -> (match trace1_cmd (Cmd(command1,state)) with
           St state1 -> Cmd(command2,state1)
@@ -114,12 +108,12 @@ and trace1_cmd = function
     | Block(NullVar,command') -> (match trace1_cmd (Cmd(command',state)) with
         St state' -> St (popenv state', getmem state', getloc state')
       | Cmd(command0,state') -> Cmd(Block(NullVar,command0),state'))
-    | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Value dv) in 
+    | Block(dv,command') -> let (environment,location) = sem_decl (topenv state,getloc state) (Variable dv) in 
       Cmd(Block(NullVar,command'),(environment::(getenv state),getmem state,location))
     | Call(identifier,Var(x)) -> (match topenv state identifier with        (* Gurda a cosa è associato l'identificatore *)
         IProc(Val(y),command') -> (match ((topenv state) x) with            (* Se è una procedura, controlla a cosa è associato il parametro (variabile) in ingresso *)
             IVar(location) -> let value = (getmem state) location in        (* Recupera dalla memoria il valore della variabile *)
-              let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(y))) in
+              let (environment,location) = sem_decl (topenv state,getloc state) (Variable (Var(y))) in
               let state0 = (environment::(getenv state),getmem state,location) in
               (match trace1_cmd (Cmd(Assign(y,Const(value)),state0)) with
                   St state1 -> Cmd(CallExec command',state1)
@@ -129,7 +123,7 @@ and trace1_cmd = function
         )
       | IProc(Ref(y),command') -> (match (topenv state) x with                            (* Controlliamo a cosa è associato il parametro (variabile) in ingresso *)
                 IVar(location) -> let (environment,_) =                                   (* Se è associato ad una variabile *)
-                  sem_decl (topenv state,location) (Value (Var(y))) in                    (* Crea il nuovo ambiente della procedura definendo y e associando la locazione di x alla locazione di y *)
+                  sem_decl (topenv state,location) (Variable (Var(y))) in                    (* Crea il nuovo ambiente della procedura definendo y e associando la locazione di x alla locazione di y *)
                   let state' = (environment::(getenv state),getmem state,getloc state) in (* Aggiunge l'ambiente della procedura alla lista, preservando la prima locazione libera *)
                   Cmd(CallExec command', state')                                          (* Passa il controllo al blocco, che si occuperà di effettuare i comandi *)
               | _ -> raise (TypeError (x ^ " is not a variable. A procedure can accept only a variable."))
@@ -138,7 +132,7 @@ and trace1_cmd = function
     )
     | Call(identifier,Const(n)) -> (match (topenv state) identifier with (* Controlla a cosa corrisponde nell'ambiente l'identificatore *)
           IProc(Val(x),command') ->
-            let (environment,location) = sem_decl (topenv state,getloc state) (Value (Var(x))) in (* Dichiara la variabile nel nuovo ambiente *)
+            let (environment,location) = sem_decl (topenv state,getloc state) (Variable (Var(x))) in (* Dichiara la variabile nel nuovo ambiente *)
             let state0 = (environment::(getenv state),getmem state,location) in                   (* Crea il nuovo stato *)
             (match trace1_cmd (Cmd(Assign(x,Const(n)),state0)) with                               (* Assegna il valore al parametro della procedura *)
                 St state1 -> Cmd(CallExec command',state1)                                        (* Esegue la procedura *)
@@ -153,19 +147,15 @@ and trace1_cmd = function
 
 (* Dichiarazione di variabili e procedure *)
 and sem_decl (environment,location) = function
-    Value dv -> ( match dv with
+  | Variable dv -> ( match dv with
     | NullVar -> (environment,location)
-    | DVSeq(dv,dv') -> let (environment',location') = sem_decl (environment,location) (Value dv) in sem_decl (environment',location') (Value dv')
+    | DVSeq(dv,dv') -> let (environment',location') = sem_decl (environment,location) (Variable dv) in sem_decl (environment',location') (Variable dv')
     | Var identifier -> let environment' = bind environment identifier (IVar location) in (environment',location+1)
-    | Array(identifier, expression) -> let offset = trace_int expression in
-      let environment' = bind environment identifier (IArr(location,expression)) 
-      in (environment',location+offset+1)
-  )
+    | Array(identifier, expression) -> let offset = trace_int expression in let environment' = bind environment identifier (IArr(location,expression)) in (environment',location+offset+1))
   | Procedure dp -> ( match dp with
     | NullProc -> (environment,location)
     | DPSeq(dp,dp') -> let (environment',location') = sem_decl (environment,location) (Procedure dp) in sem_decl (environment',location') (Procedure dp')
-    | Proc(identifier,param,cmd) -> let environment' = bind environment identifier (IProc(param,cmd)) in (environment',location)
-  )
+    | Proc(identifier,param,cmd) -> let environment' = bind environment identifier (IProc(param,cmd)) in (environment',location))
 
 let rec trace_rec iterations_number state =
   if iterations_number <= 0 then [state]
@@ -175,6 +165,6 @@ let rec trace_rec iterations_number state =
     with NoRuleApplies -> [state]
 
 let trace iterations_number (Prog(dv,dp,cmd)) =
-  let (environment,location) = sem_decl (botenv,0) (Value dv) in
+  let (environment,location) = sem_decl (botenv,0) (Variable dv) in
   let (environment',location') = sem_decl (environment,location) (Procedure dp) in
   trace_rec iterations_number (Cmd(cmd,([environment'],botmem,location')))
