@@ -26,7 +26,7 @@ let rec trace_int expr = match expr with
   | Add(Const(n1),Const(n2)) -> trace_int (Const(n1+n2))
   | Sub(Const(n1),Const(n2)) -> trace_int (Const(n1-n2))
   | Mul(Const(n1),Const(n2)) -> trace_int (Const(n1*n2))
-  | _ -> failwith ((string_of_expr expr) ^ " is not a number.")
+  | _ -> raise (TypeError ((string_of_expr expr) ^ " is not a number."))
 
 let is_val = function
     True -> true
@@ -34,10 +34,12 @@ let is_val = function
   | Const _ -> true
   | _ -> false
 
+(* Valore di una variabile *)
 let apply state variable = match topenv state variable with
     IVar location -> getmem state location
   | _ -> failwith "apply error"
 
+(* Valore contenuto in un array *)
 let arr_apply state variable index = match topenv state variable with
     IArr(location,expr) when index < (trace_int expr) -> getmem state (location + index)
   | _ -> failwith "apply error"
@@ -81,7 +83,7 @@ and trace1_cmd = function
     St _ -> raise NoRuleApplies
   | Cmd(command,state) -> match command with
       Skip -> St state
-    | Break -> failwith ("There is no repeat loop to break!")
+    | Break -> failwith ("Expected forever, found EOF.") (* Il break interrompe la computazione di un repeat. Se chiamato fuori dal costrutto, lancia un'eccezione. *)
     | Assign(identifier,Const(n)) -> (match topenv state identifier with
         IVar location -> St (getenv state, bind (getmem state) location n, getloc state)
       | _ -> raise (UnboundVar("Variable " ^ identifier ^ " not defined.")))

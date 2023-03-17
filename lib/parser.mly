@@ -104,7 +104,3 @@ cmd:
 pf:
   | VAL; x = ID { Val(x) }
   | REF; x = ID { Ref(x) }
-
-(* Parametri attuali 
-pa:
-  | e = expr { CurrentP(e) }*)

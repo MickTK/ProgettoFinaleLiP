@@ -34,5 +34,4 @@ type configuration = St of state | Cmd of cmd * state
 
 exception TypeError of string
 exception UnboundVar of string
-exception PredOfZero
 exception NoRuleApplies
