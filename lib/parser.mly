@@ -65,9 +65,8 @@ dv:
 
 (* Dichiarazioni procedure *)
 dp:
-  | d0 = dp; SEQ; d1 = dp { DPSeq(d0,d1) }
   | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE; d = dp { DPSeq(Proc(x,param,c),d) }
-  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE { Proc(x,param,c) }
+  | PROC; x = ID; LPAREN; param = pf; RPAREN; LBRACE; c = cmd; RBRACE; SEQ; { Proc(x,param,c) }
   | { NullProc }
 
 (* Espressioni *)
