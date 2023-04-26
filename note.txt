@@ -1,7 +1,0 @@
-I parametri attuali sono definiti come alias di un'espressione.
-
-Il comando CallExec si occupa di gestire l'ambiente associato ad una procedura, creando un nuovo ambiente in caso di chiamata (di procedura) e rimuovendo l'ambiente una volta finito di eseguire il blocco.
-
-La funzione arr_apply restituisce il valore (in memoria) associato ad un dato indice di un dato vettore.
-
-I flag (Ok e Br) sono astratti. Il flag Br è stato implementato tramite delle regole small step relative al comando Break, mentre il flag Ok non viene mai rappresentato concretamente e rappresenta l'esecuzione normale del programma. Il flag Br è stato implementato in questo modo: quando viene eseguito il comando Break, vengono scartati tutti i comandi successivi fino a che il comando trovato non è un Repeat. Quando viene trovato un comando Repeat, viene scartato sia il comando Repeat che il comando Break, in modo da permettere al programma la sua normale esecuzione (flag Ok). Se non viene trovato un comando Repeat e il programma raggiunge la fine del file, viene lanciata un'eccezione (il comando Repeat pone alla fine della sequenza di comandi da eseguire, un altro comando Repeat con gli stessi comandi).
